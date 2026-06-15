@@ -46,10 +46,22 @@ def save_wav(wav_bytes, path):
 def to_mp3(out_path):
     if out_path[-4:] == '.wav':
         out_path = out_path[:-4]
-    subprocess.check_call(
-        f'ffmpeg -threads 1 -loglevel error -i "{out_path}.wav" -vn -b:a 192k -y -hide_banner -async 1 "{out_path}.mp3"',
-        shell=True, stdin=subprocess.PIPE)
-    subprocess.check_call(f'rm -f "{out_path}.wav"', shell=True)
+    wav_path = f"{out_path}.wav"
+    mp3_path = f"{out_path}.mp3"
+    subprocess.check_call([
+        'ffmpeg',
+        '-threads', '1',
+        '-loglevel', 'error',
+        '-i', wav_path,
+        '-vn',
+        '-b:a', '192k',
+        '-y',
+        '-hide_banner',
+        '-async', '1',
+        mp3_path,
+    ])
+    if os.path.exists(wav_path):
+        os.remove(wav_path)
 
 
 def convert_to_wav(wav_path):

@@ -16,7 +16,7 @@ import contextlib
 import glob
 import os
 import re
-import subprocess
+import shutil
 import traceback
 
 import torch
@@ -35,14 +35,21 @@ def dist_load(path):
         assert len(os.path.basename(path)) > 0
         shm_ckpt_path = f'{tmpdir}/{hparams["exp_name"]}/{os.path.basename(path)}'
         if LOCAL_RANK == 0:
-            subprocess.check_call(
-                f'mkdir -p {os.path.dirname(shm_ckpt_path)}; '
-                f'cp -Lr {path} {shm_ckpt_path}', shell=True)
+            os.makedirs(os.path.dirname(shm_ckpt_path), exist_ok=True)
+            if os.path.isdir(path):
+                if os.path.exists(shm_ckpt_path):
+                    shutil.rmtree(shm_ckpt_path)
+                shutil.copytree(path, shm_ckpt_path, symlinks=False)
+            else:
+                shutil.copy2(path, shm_ckpt_path, follow_symlinks=True)
         dist.barrier()
         yield shm_ckpt_path
         dist.barrier()
         if LOCAL_RANK == 0:
-            subprocess.check_call(f'rm -rf {shm_ckpt_path}', shell=True)
+            if os.path.isdir(shm_ckpt_path):
+                shutil.rmtree(shm_ckpt_path)
+            elif os.path.exists(shm_ckpt_path):
+                os.remove(shm_ckpt_path)
 
 
 def torch_load_dist(path, map_location='cpu'):
@@ -67,7 +74,7 @@ def get_all_ckpts(work_dir, steps=None):
     else:
         ckpt_path_pattern = f'{work_dir}/model_ckpt_steps_{steps}.ckpt'
     return sorted(glob.glob(ckpt_path_pattern),
-                  key=lambda x: -int(re.findall('.*steps\_(\d+)\.ckpt', x)[0]))
+                  key=lambda x: -int(re.findall(r'.*steps_(\d+)\.ckpt', x)[0]))
 
 
 def load_ckpt(cur_model, ckpt_base_dir, model_name='model', force=True, strict=True,

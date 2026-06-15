@@ -94,10 +94,18 @@ $env:CUDA_VISIBLE_DEVICES=0 # Powershell on Windows
 # ! You should download the pretrained checkpoint before running the following command
 docker build . -t megatts3:latest
 
-# For GPU inference
-docker run -it -p 127.0.0.1:7929:7929 --gpus all -e CUDA_VISIBLE_DEVICES=0 megatts3:latest
-# For CPU inference
-docker run -it -p 127.0.0.1:7929:7929  megatts3:latest
+# For GPU inference (local-only by default)
+docker run -it -p 127.0.0.1:7860:7860 --gpus all -e CUDA_VISIBLE_DEVICES=0 megatts3:latest
+# For CPU inference (local-only by default)
+docker run -it -p 127.0.0.1:7860:7860 megatts3:latest
+
+# Remote exposure must explicitly enable auth.
+docker run -it -p 7860:7860 --gpus all \
+  -e CUDA_VISIBLE_DEVICES=0 \
+  -e GRADIO_SERVER_NAME=0.0.0.0 \
+  -e GRADIO_USERNAME=admin \
+  -e GRADIO_PASSWORD=change_me \
+  megatts3:latest
 
 # Visit http://127.0.0.1:7860/ for gradio.
 ```
@@ -138,7 +146,11 @@ python tts/infer_cli.py --input_wav 'assets/English_prompt.wav' --input_text 'è¿
 **Web UI Usage**
 ``` bash
 # We also support cpu inference, but it may take about 30 seconds (for 10 inference steps).
+# Local-only by default.
 python tts/gradio_api.py
+
+# Remote exposure requires both a non-local bind address and explicit auth.
+GRADIO_SERVER_NAME=0.0.0.0 GRADIO_USERNAME=admin GRADIO_PASSWORD=change_me python tts/gradio_api.py
 ```
 
 ## Submodules

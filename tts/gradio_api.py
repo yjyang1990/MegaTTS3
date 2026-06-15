@@ -21,6 +21,9 @@ import traceback
 from tts.infer_cli import MegaTTS3DiTInfer, convert_to_wav, cut_wav
 
 
+LOCAL_SERVER_NAMES = {'127.0.0.1', 'localhost', '::1'}
+
+
 def model_worker(input_queue, output_queue, device_id):
     device = None
     if device_id is not None:
@@ -56,6 +59,32 @@ def main(inp_audio, inp_npy, inp_text, infer_timestep, p_w, t_w, processes, inpu
         return None
 
 
+def build_gradio_launch_kwargs():
+    server_name = os.environ.get('GRADIO_SERVER_NAME', '127.0.0.1')
+    server_port = int(os.environ.get('GRADIO_SERVER_PORT', '7860'))
+    username = os.environ.get('GRADIO_USERNAME')
+    password = os.environ.get('GRADIO_PASSWORD')
+
+    if bool(username) != bool(password):
+        raise RuntimeError('GRADIO_USERNAME and GRADIO_PASSWORD must be set together.')
+
+    auth = (username, password) if username and password else None
+    if server_name not in LOCAL_SERVER_NAMES and auth is None:
+        raise RuntimeError(
+            'Refusing to expose Gradio on a non-local host without auth. '
+            'Set GRADIO_USERNAME and GRADIO_PASSWORD, or keep '
+            'GRADIO_SERVER_NAME=127.0.0.1.'
+        )
+
+    return {
+        'auth': auth,
+        'debug': False,
+        'enable_monitoring': False,
+        'server_name': server_name,
+        'server_port': server_port,
+    }
+
+
 if __name__ == '__main__':
     mp.set_start_method('spawn', force=True)
     mp_manager = mp.Manager()
@@ -88,6 +117,6 @@ if __name__ == '__main__':
                                 description="Upload a speech clip as a reference for timbre, " +
                                 "upload the pre-extracted latent file, "+
                                 "input the target text, and receive the cloned voice.", concurrency_limit=1)
-    api_interface.launch(debug=True)
+    api_interface.launch(**build_gradio_launch_kwargs())
     for p in processes:
         p.join()

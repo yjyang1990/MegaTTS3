@@ -15,6 +15,7 @@
 import json
 import os
 import argparse
+import re
 import librosa
 import numpy as np
 import torch
@@ -37,6 +38,13 @@ from tts.utils.commons.hparams import hparams, set_hparams
 
 if "TOKENIZERS_PARALLELISM" not in os.environ:
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
+
+def sanitize_filename_component(text, max_length=20):
+    safe_text = re.sub(r'[^\w.\- ]', '_', text[:max_length], flags=re.UNICODE)
+    safe_text = re.sub(r'\s+', ' ', safe_text).strip(' ._')
+    return safe_text or 'output'
+
 
 def convert_to_wav(wav_path):
     # Check if the file exists
@@ -273,6 +281,8 @@ if __name__ == '__main__':
     resource_context = infer_ins.preprocess(file_content, latent_file=wav_path.replace('.wav', '.npy'))
     wav_bytes = infer_ins.forward(resource_context, input_text, time_step=time_step, p_w=p_w, t_w=t_w)
 
-    print(f"| Saving results to {out_path}/[P]{input_text[:20]}.wav")
     os.makedirs(out_path, exist_ok=True)
-    save_wav(wav_bytes, f'{out_path}/[P]{input_text[:20]}.wav')
+    output_name = f'[P]{sanitize_filename_component(input_text)}.wav'
+    output_path = os.path.join(out_path, output_name)
+    print(f"| Saving results to {output_path}")
+    save_wav(wav_bytes, output_path)
